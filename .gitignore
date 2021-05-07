@@ -10,3 +10,6 @@ EQTransformer/__pycache__
 EQTransformer/core/__pycache__
 EQTransformer/utils/__pycache__
 
+## Notebook files
+.ipynb_checkpoints/
+test_predict_on_model.ipynb
