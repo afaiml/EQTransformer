@@ -6,7 +6,7 @@ Created on Sat Jan 25 22:34:05 2020
 @author: mostafamousavi
 """
 
-from EQTransformer.core.predictor import predictor
+from EQTransformer.core.predictor import predictor, load_tf_model, predict_on_model
 import pytest
 import glob
 import os
@@ -33,6 +33,17 @@ def test_predictor():
     
     dir_list = [ev for ev in os.listdir('.') if ev.split('_')[-1] == 'outputs']      
     assert dir_list[1] == 'test_predictor_outputs' 
+
+def test_predict_on_load():
+    
+    model = load_tf_model("ModelsAndSampleData/EqT_model.h5")
+    
+    predict_on_model(input_dir="ModelsAndSampleData/100samples.hdf5",
+                     input_model=model,
+                     output_dir="test_output/test_predictor")
+    
+    dir_list = [ev for ev in os.listdir('test_output/test_predictor') if ev.split('_')[-1] == 'outputs']      
+    assert dir_list[1] == 'test_predictor_outputs'
     
 def test_report():
     report = glob.glob("test_predictor_outputs/X_report.txt")
