@@ -48,6 +48,362 @@ try:
             EQT_VERSION = l.split('"')[1]
 except Exception:
     EQT_VERSION = "0.1.59"
+    
+
+def load_tf_model(model_dir, loss_types=['binary_crossentropy', 'binary_crossentropy', 'binary_crossentropy'],
+                  loss_weights=[0.03, 0.40, 0.58]):
+    """
+    Loads a model to be used in predict_on_model()
+
+    Parameters
+    ----------
+    model_dir : str
+        Path to a trained model.
+        
+    loss_weights: list, default=[0.03, 0.40, 0.58]
+        loss weights for detection, P picking, and S picking respectively.
+             
+    loss_types: list, default=['binary_crossentropy', 'binary_crossentropy', 'binary_crossentropy'] 
+        Loss types for detection, P picking, and S picking respectively.
+
+    Returns
+    -------
+    a compiled tensorflow model.
+
+    """
+    
+    args = {
+    "model_dir": model_dir,
+    "input_hdf5": None,
+    "input_csv": None,
+    "loss_weights": loss_weights,  
+    "loss_types": loss_types     
+    }
+    
+    print(' *** Loading the model ...', flush=True)        
+    model = load_model(args['model_dir'], 
+                       custom_objects={'SeqSelfAttention': SeqSelfAttention, 
+                                       'FeedForward': FeedForward,
+                                       'LayerNormalization': LayerNormalization, 
+                                       'f1': f1                                                                            
+                                        })
+    model.compile(loss = args['loss_types'],
+                  loss_weights =  args['loss_weights'],           
+                  optimizer = Adam(lr = 0.001),
+                  metrics = [f1])
+    print('*** Loading is complete!', flush=True)  
+    return model
+
+def predict_on_model(input_dir=None,
+              input_model=None,
+              output_dir=None,
+              output_probabilities=False,
+              detection_threshold=0.3,                
+              P_threshold=0.1,
+              S_threshold=0.1, 
+              number_of_plots=10,
+              plot_mode='time',
+              estimate_uncertainty=False, 
+              number_of_sampling=5,
+              loss_weights=[0.03, 0.40, 0.58],
+              loss_types=['binary_crossentropy', 'binary_crossentropy', 'binary_crossentropy'],
+              input_dimention=(6000, 3),
+              normalization_mode='std',
+              batch_size=500,
+              gpuid=None,
+              gpu_limit=None,
+              number_of_cpus=5,
+              use_multiprocessing=True,
+              keepPS=True,
+              spLimit=60):
+    
+    """
+    
+    Applies a trained model to a windowed waveform to perform both detection and picking at the same time. 
+
+
+    Parameters
+    ----------
+    input_dir: str, default=None
+        Directory name containing hdf5 and csv files-preprocessed data.
+        
+    input_model: tf.model, default=None
+        a trained model.
+
+    output_dir: str, default=None
+        Output directory that will be generated. 
+        
+    output_probabilities: bool, default=False
+        If True, it will output probabilities and estimated uncertainties for each trace into an HDF file.       
+         
+    detection_threshold : float, default=0.3
+        A value in which the detection probabilities above it will be considered as an event.
+          
+    P_threshold: float, default=0.1
+        A value which the P probabilities above it will be considered as P arrival.
+
+    S_threshold: float, default=0.1
+        A value which the S probabilities above it will be considered as S arrival.
+               
+    number_of_plots: float, default=10
+        The number of plots for detected events outputed for each station data.
+
+    plot_mode: str, default='time'
+        The type of plots: 'time': only time series or 'time_frequency', time and spectrograms.
+          
+    estimate_uncertainty: bool, default=False
+        If True uncertainties in the output probabilities will be estimated.           
+
+    number_of_sampling: int, default=5
+        Number of sampling for the uncertainty estimation. 
+               
+    loss_weights: list, default=[0.03, 0.40, 0.58]
+        Loss weights for detection, P picking, and S picking respectively.
+             
+    loss_types: list, default=['binary_crossentropy', 'binary_crossentropy', 'binary_crossentropy'] 
+        Loss types for detection, P picking, and S picking respectively.
+
+    input_dimention: tuple, default=(6000, 3)
+        Loss types for detection, P picking, and S picking respectively.      
+
+    normalization_mode: str, default='std' 
+        Mode of normalization for data preprocessing, 'max', maximum amplitude among three components, 'std', standard deviation.
+           
+    batch_size: int, default=500 
+        Batch size. This wont affect the speed much but can affect the performance. A value beteen 200 to 1000 is recommanded.
+
+    gpuid: int, default=None
+        Id of GPU used for the prediction. If using CPU set to None.
+         
+    gpu_limit: int, default=None
+        Set the maximum percentage of memory usage for the GPU.
+          
+    number_of_cpus: int, default=5
+        Number of CPUs used for the parallel preprocessing and feeding of data for prediction.
+
+    use_multiprocessing: bool, default=True
+        If True, multiple CPUs will be used for the preprocessing of data even when GPU is used for the prediction.        
+
+    keepPS: bool, default=False
+        If True, only detected events that have both P and S picks will be written otherwise those events with either P or S pick. 
+        
+    spLimit: int, default=60
+        S - P time in seconds. It will limit the results to those detections with events that have a specific S-P time limit. 
+        
+    Returns
+    -------- 
+    ./output_dir/STATION_OUTPUT/X_prediction_results.csv: A table containing all the detection, and picking results. Duplicated events are already removed.      
+    
+    ./output_dir/STATION_OUTPUT/X_report.txt: A summary of the parameters used for prediction and performance.
+    
+    ./output_dir/STATION_OUTPUT/figures: A folder containing plots detected events and picked arrival times. 
+    
+    ./time_tracks.pkl: A file containing the time track of the continous data and its type.
+    
+
+    Notes
+    --------
+    Estimating the uncertainties requires multiple predictions and will increase the computational time. 
+        
+    """ 
+    args = {
+     "input_dir": input_dir,
+     "input_hdf5": None,
+     "input_csv": None,
+     "input_model": input_model,
+     "output_dir": output_dir,
+     "output_probabilities": output_probabilities,
+     "detection_threshold": detection_threshold,
+     "P_threshold": P_threshold,
+     "S_threshold": S_threshold,
+     "number_of_plots": number_of_plots,
+     "plot_mode": plot_mode,
+     "estimate_uncertainty": estimate_uncertainty,
+     "number_of_sampling": number_of_sampling,
+     "loss_weights": loss_weights,     
+     "loss_types": loss_types,
+     "input_dimention": input_dimention,
+     "normalization_mode": normalization_mode,
+     "batch_size": batch_size,
+     "gpuid": gpuid,
+     "gpu_limit": gpu_limit,
+     "number_of_cpus": number_of_cpus,
+     "use_multiprocessing": use_multiprocessing,
+     "keepPS": keepPS,
+     "spLimit": spLimit
+     }
+        
+    availble_cpus = multiprocessing.cpu_count()
+    if args['number_of_cpus'] > availble_cpus:
+        args['number_of_cpus'] = availble_cpus
+        
+    if args['gpuid']:     
+        os.environ['CUDA_VISIBLE_DEVICES'] = '{}'.format(args['gpuid'])
+        tf.Session(config=tf.ConfigProto(log_device_placement=True))
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        config.gpu_options.per_process_gpu_memory_fraction = float(args['gpu_limit']) 
+        K.tensorflow_backend.set_session(tf.Session(config=config))          
+                                  
+    class DummyFile(object):
+        file = None
+        def __init__(self, file):
+            self.file = file
+    
+        def write(self, x):
+            # Avoid print() second call (useless \n)
+            if len(x.rstrip()) > 0:
+                tqdm.write(x, file=self.file)
+    
+    @contextlib.contextmanager
+    def nostdout():
+        save_stdout = sys.stdout
+        sys.stdout = DummyFile(sys.stdout)
+        yield
+        sys.stdout = save_stdout
+    
+
+    print('============================================================================')
+    print('Running EqTransformer ', str(EQT_VERSION))
+      
+    model = input_model
+
+    out_dir = os.path.join(os.getcwd(), str(args['output_dir']))
+    if os.path.isdir(out_dir):
+        print('============================================================================')        
+        print(f' *** {out_dir} already exists!')
+        inp = input(" --> Type (Yes or y) to create a new empty directory! otherwise it will overwrite!   ")
+        if inp.lower() == "yes" or inp.lower() == "y":
+            shutil.rmtree(out_dir)  
+            os.makedirs(out_dir) 
+    if platform.system() == 'Windows': 
+        station_list = [ev.split(".")[0] for ev in listdir(args["input_dir"]) if ev.split("\\")[-1] != ".DS_Store"];
+    else:
+        station_list = [ev.split(".")[0] for ev in listdir(args['input_dir']) if ev.split("/")[-1] != ".DS_Store"];
+    station_list = sorted(set(station_list))
+    
+    print(f"######### There are files for {len(station_list)} stations in {args['input_dir']} directory. #########", flush=True)
+    for ct, st in enumerate(station_list):
+        if platform.system() == 'Windows': 
+            args["input_hdf5"] = args["input_dir"]+"\\"+st+".hdf5"
+            args["input_csv"] = args["input_dir"]+"\\"+st+".csv"
+        else:            
+            args["input_hdf5"] = args["input_dir"]+"/"+st+".hdf5"
+            args["input_csv"] = args["input_dir"]+"/"+st+".csv"
+    
+        save_dir = os.path.join(out_dir, str(st)+'_outputs')
+        out_probs = os.path.join(save_dir, 'prediction_probabilities.hdf5')
+        save_figs = os.path.join(save_dir, 'figures') 
+        if os.path.isdir(save_dir):
+            shutil.rmtree(save_dir)  
+        os.makedirs(save_dir) 
+        if args['number_of_plots']:
+            os.makedirs(save_figs) 
+        try:
+            os.remove(out_probs)
+        except Exception:
+             pass 
+        
+        if args['output_probabilities']:           
+            HDF_PROB = h5py.File(out_probs, 'a')
+            HDF_PROB.create_group("probabilities")
+            HDF_PROB.create_group("uncertainties")  
+        else:
+            HDF_PROB = None   
+            
+        csvPr_gen = open(os.path.join(save_dir,'X_prediction_results.csv'), 'w')          
+        predict_writer = csv.writer(csvPr_gen, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        predict_writer.writerow(['file_name', 
+                                 'network',
+                                 'station',
+                                 'instrument_type',
+                                 'station_lat',
+                                 'station_lon',
+                                 'station_elv',
+                                 'event_start_time',
+                                 'event_end_time',
+                                 'detection_probability',
+                                 'detection_uncertainty', 
+                                 'p_arrival_time',
+                                 'p_probability',
+                                 'p_uncertainty',
+                                 'p_snr',
+                                 's_arrival_time',
+                                 's_probability',
+                                 's_uncertainty',
+                                 's_snr'
+                                     ])  
+        csvPr_gen.flush()
+        print(f'========= Started working on {st}, {ct+1} out of {len(station_list)} ...', flush=True)
+
+        start_Predicting = time.time()       
+        detection_memory = []
+        plt_n = 0
+    
+        df = pd.read_csv(args['input_csv']) 
+        prediction_list = df.trace_name.tolist() 
+        fl = h5py.File(args['input_hdf5'], 'r')    
+        list_generator=generate_arrays_from_file(prediction_list, args['batch_size']) 
+    
+        pbar_test = tqdm(total= int(np.ceil(len(prediction_list)/args['batch_size'])), ncols=100, file=sys.stdout)        
+        for bn in range(int(np.ceil(len(prediction_list) / args['batch_size']))):  
+            with nostdout():              
+                pbar_test.update()
+                
+            new_list = next(list_generator)  
+            prob_dic=_gen_predictor(new_list, args, model)
+    
+            pred_set={}
+            for ID in new_list:
+                dataset = fl.get('data/'+str(ID))
+                pred_set.update( {str(ID) : dataset})  
+                
+            plt_n, detection_memory= _gen_writer(new_list, args, prob_dic, pred_set, HDF_PROB, predict_writer, save_figs, csvPr_gen, plt_n, detection_memory, keepPS, spLimit)    
+
+        end_Predicting = time.time() 
+        delta = (end_Predicting - start_Predicting) 
+        hour = int(delta / 3600)
+        delta -= hour * 3600
+        minute = int(delta / 60)
+        delta -= minute * 60
+        seconds = delta     
+        
+        
+        dd = pd.read_csv(os.path.join(save_dir,'X_prediction_results.csv'))
+        print(f'\n', flush=True)
+        print(' *** Finished the prediction in: {} hours and {} minutes and {} seconds.'.format(hour, minute, round(seconds, 2)), flush=True)         
+        print(' *** Detected: '+str(len(dd))+' events.', flush=True)
+        print(' *** Wrote the results into --> " ' + str(save_dir)+' "', flush=True)
+    
+        with open(os.path.join(save_dir,'X_report.txt'), 'a') as the_file:    
+            the_file.write('================== Overal Info =============================='+'\n')               
+            the_file.write('date of report: '+str(datetime.now())+'\n')         
+            the_file.write('input_hdf5: '+str(args['input_hdf5'])+'\n')            
+            the_file.write('input_csv: '+str(args['input_csv'])+'\n')
+            the_file.write('output_dir: '+str(save_dir)+'\n')  
+            the_file.write('================== Prediction Parameters ======================='+'\n')  
+            the_file.write('finished the prediction in:  {} hours and {} minutes and {} seconds \n'.format(hour, minute, round(seconds, 2))) 
+            the_file.write('detected: '+str(len(dd))+' events.'+'\n')                                       
+            the_file.write('writting_probability_outputs: '+str(args['output_probabilities'])+'\n')  
+            the_file.write('loss_types: '+str(args['loss_types'])+'\n')
+            the_file.write('loss_weights: '+str(args['loss_weights'])+'\n')
+            the_file.write('batch_size: '+str(args['batch_size'])+'\n')       
+            the_file.write('================== Other Parameters ========================='+'\n')            
+            the_file.write('normalization_mode: '+str(args['normalization_mode'])+'\n')
+            the_file.write('estimate uncertainty: '+str(args['estimate_uncertainty'])+'\n')
+            the_file.write('number of Monte Carlo sampling: '+str(args['number_of_sampling'])+'\n')             
+            the_file.write('detection_threshold: '+str(args['detection_threshold'])+'\n')            
+            the_file.write('P_threshold: '+str(args['P_threshold'])+'\n')
+            the_file.write('S_threshold: '+str(args['S_threshold'])+'\n')
+            the_file.write('number_of_plots: '+str(args['number_of_plots'])+'\n')                        
+            the_file.write('use_multiprocessing: '+str(args['use_multiprocessing'])+'\n')            
+            the_file.write('gpuid: '+str(args['gpuid'])+'\n')
+            the_file.write('gpu_limit: '+str(args['gpu_limit'])+'\n')    
+            the_file.write('keepPS: '+str(args['keepPS'])+'\n')      
+            the_file.write('spLimit: '+str(args['spLimit'])+' seconds\n')      
+      
+    
+            
 
 def predictor(input_dir=None,
               input_model=None,
