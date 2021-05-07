@@ -1,2 +1,12 @@
-## Project Files
+## Spyder Files
 .spyproject/
+
+## Test Output
+test_output/
+tests/__pycache__
+
+## normal pycache
+EQTransformer/__pycache__
+EQTransformer/core/__pycache__
+EQTransformer/utils/__pycache__
+
