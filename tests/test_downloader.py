@@ -73,7 +73,7 @@ def test_exact_station_downloader():
                         end_time = "2021-04-01 00:00:03.00")
     
     dir_list = [ev for ev in os.listdir('test_output/test_downloader')]  
-    if ('exact_downloads_mseeds' in dir_list) and ('exact_station_list.json' in dir_list):
+    if ('exact_download_mseeds' in dir_list) and ('exact_station_list.json' in dir_list):
         successful = True
     else:
         successful = False 

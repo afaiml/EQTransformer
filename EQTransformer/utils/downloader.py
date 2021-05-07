@@ -339,11 +339,37 @@ def downloadMseedsExact(client_name, stations_json, output_dir, start_time, end_
     if n_processor==None:
         for st in station_dic:
             print(f'======= Working on {st} station.')
-            client.get_waveforms("*", st, "*", channels, start_time, end_time)
+            stream = client.get_waveforms("*", st, "*", channels, start_time, end_time)
+            for trace in stream:
+                sl = str(trace)
+                filename = ( sl[0] + "__" 
+                            + str(start_t).split(".")[0].replace("-", "").replace(":", "")
+                            + "Z__"
+                            + str(end_t).split(".")[0].replace("-", "").replace(":", "") 
+                            + "Z.mseed")
+                sitename = str(trace).split(".")[1]
+                sitepath = os.path.join(output_dir, sitename)
+                if not os.path.exists(sitepath):
+                    os.makedirs(sitepath)
+            
+                trace.write(os.path.join(sitepath, filename)) 
     else:        
         def process(st):
             print(f'======= Working on {st} station.')
-            client.get_waveforms("*", st, "*", channels, start_time, end_time)
+            stream = client.get_waveforms("*", st, "*", channels, start_time, end_time)
+            for trace in stream:
+                sl = str(trace)
+                filename = ( sl[0] + "__" 
+                            + str(start_t).split(".")[0].replace("-", "").replace(":", "")
+                            + "Z__"
+                            + str(end_t).split(".")[0].replace("-", "").replace(":", "") 
+                            + "Z.mseed")
+                sitename = str(trace).split(".")[1]
+                sitepath = os.path.join(output_dir, sitename)
+                if not os.path.exists(sitepath):
+                    os.makedirs(sitepath)
+            
+                trace.write(os.path.join(sitepath, filename)) 
             
         with ThreadPool(n_processor) as p:
             p.map(process, [ st for st in station_dic])  
