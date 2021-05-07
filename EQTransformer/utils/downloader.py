@@ -21,6 +21,73 @@ import multiprocessing
 import numpy as np
 
 
+def makeStationListExact(json_path, client, stations, start_time, end_time, channel_list=[], **kwargs):
+    
+    """
+    Uses fdsn to create an exact station list from a single client and station list.
+    
+    Parameters
+    ----------
+    json_path: str
+        Path of the json file that will be returned
+        
+    client: str
+        str of client names e.g. "IRIS"
+        
+    site_list: str
+        String list of station names e.g. "MALT, AKH, BATM, BGD, GAZ"
+        
+    start_time: str
+        Start DateTime for the beginning of the period in "YYYY-MM-DDThh:mm:ss.f" format.
+        
+    end_time: str
+    End DateTime for the beginning of the period in "YYYY-MM-DDThh:mm:ss.f" format.
+    
+    channel_list: str, default=[]
+        A list containing the desired channel codes. Downloads will be limited to these channels based on priority. Defaults to [] --> all channels
+        
+    kwargs: 
+        special symbol for passing Client.get_stations arguments
+        
+    """
+
+    station_list = {}
+    ## Can be made to use multiple clients by adding a 
+    ## for cl in clients here and adjusting the input to a list of clients.
+    inventory = Client(client).get_stations(station=stations,
+                                            starttime=start_time,
+                                            endtime=end_time,
+                                            level='channel')
+
+    for ev in inventory:
+        net = ev.code
+        for st in ev:
+            station = st.code
+            print(str(net)+"--"+str(station))
+            elv = st.elevation
+            lat = st.latitude
+            lon = st.longitude
+            new_chan = [ch.code for ch in st.channels]
+            if len(channel_list) > 0:
+                chan_priority=[ch[:2] for ch in channel_list]
+
+                for chnn in chan_priority:
+                    if chnn in [ch[:2] for ch in new_chan]:
+                        new_chan = [ch for ch in new_chan if ch[:2] == chnn]                     
+
+            
+            if len(new_chan) > 0 and (station not in station_list):
+                station_list[str(station)] ={"network": net,
+                                          "channels": list(set(new_chan)),
+                                          "coords": [lat, lon, elv]
+                                          }
+    json_dir = os.path.dirname(json_path)
+    if not os.path.exists(json_dir):
+        os.makedirs(json_dir)
+    with open(json_path, "w") as fp:
+        json.dump(station_list, fp)
+         
+    
 def makeStationList(json_path,client_list, min_lat, max_lat, min_lon, max_lon, start_time, end_time, channel_list=[], filter_network=[], filter_station=[],**kwargs):
 
 
@@ -213,7 +280,73 @@ def downloadMseeds(client_list, stations_json, output_dir, start_time, end_time,
             p.map(process, [ st for st in station_dic])      
         
        
+
+def downloadMseedsExact(client_name, stations_json, output_dir, start_time, end_time, channel_list=[], n_processor=None):
     
+    """
+    
+    Uses obspy downloader to get continuous waveforms from a specific client in miniseed format. 
+ 
+    Parameters
+    ----------
+    client_name: str
+        client name e.g. "IRIS"
+
+    stations_json: dic,
+        Station informations from the json created in makeStationListExact.
+        
+    output_dir: str
+        Output directory.
+        
+    start_time: str
+        Start DateTime for the beginning of the period in "YYYY-MM-DDThh:mm:ss.f" format.
+        
+    end_time: str
+        End DateTime for the beginning of the period in "YYYY-MM-DDThh:mm:ss.f" format.
+        
+    channel_list: str, default=[]
+        A list containing the desired channel codes. Downloads will be limited to these channels based on priority. Defaults to [] --> all channels
+        
+    n_processor: int, default=None
+        Number of CPU processors for parallel downloading.
+
+    Returns
+    ----------
+
+    output_name/station_name/*.mseed: Miniseed fiels for each station.      
+ 
+    Warning
+    ----------
+    usage of multiprocessing and parallel downloads heavily depends on the client. It might cause missing some data for some network. Please test first for some short period and if It did miss some chunks of data for some channels then set n_processor=None to avoid parallel downloading.        
+        
+    """
+     
+         
+    json_file = open(stations_json)
+    station_dic = json.load(json_file)
+    print(f"####### There are {len(station_dic)} stations in the list. #######")
+
+    start_t = UTCDateTime(start_time)
+    end_t = UTCDateTime(end_time)
+    
+    client = Client(client_name);
+    
+    if len(channel_list) == 0:
+        channels = "*"
+    else:
+        channels = channel_list
+ 
+    if n_processor==None:
+        for st in station_dic:
+            print(f'======= Working on {st} station.')
+            client.get_waveforms("*", st, "*", channels, start_time, end_time)
+    else:        
+        def process(st):
+            print(f'======= Working on {st} station.')
+            client.get_waveforms("*", st, "*", channels, start_time, end_time)
+            
+        with ThreadPool(n_processor) as p:
+            p.map(process, [ st for st in station_dic])  
     
 def downloadSacs(client, stations_json, output_dir, start_time, end_time, patience, n_processor=None):
     
@@ -359,7 +492,6 @@ def _get_w(bg, st, station_dic, end_t, mdl, domain, output_dir, n_days, channel_
         time.sleep(np.random.randint(25, 30))
         bg = next_month
         next_month = bg + datetime.timedelta(n_days)     
-
 
 
 
