@@ -7,8 +7,6 @@ Created on Fri May 7 18:04:30 2021
 @author: cbell
 """
 
-import os
-import json
 from flask import Flask, request
 from EQTransformer.core.predictor import load_tf_model, predict_on_model
 from EQTransformer.utils.hdf5_maker import preprocessor
@@ -38,8 +36,9 @@ def create_json():
                              client = client,
                              stations = stations,
                              start_time = start_time,
-                             end_time = end_time)
-        
+                             end_time = end_time,
+                             channel_list="BH*")
+        return("JSON created")
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -49,22 +48,24 @@ def predict():
         end_time = request.json['end_time']
         mseed_dir = "download_mseeds"
         preproc_dir = "preproc"
-        hdf5_dir = "download_mseed_processed_hdfs"
+        hdf5_dir = "download_mseeds_processed_hdfs"
     
-        downloadMseedsExact(client_name = client,
+        downloadMseedsExact(client = client,
                             stations_json = json_path,
                             output_dir = mseed_dir,
                             start_time = start_time,
-                            end_time = end_time)
+                            end_time = end_time,
+                            channel_list = "BH*")
     
         preprocessor(preproc_dir, mseed_dir, json_path)
         
         predict_on_model(input_dir = hdf5_dir,
                          input_model = model,
+                         output_probabilities=True,
                          output_dir = "detections1")
         
         return "Prediction created"
         ## Call Converter and Post to USNDS once we have that info.
         
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=False, port=5005)
+    app.run(host='0.0.0.0', debug=False, port=5005, threaded=False)
