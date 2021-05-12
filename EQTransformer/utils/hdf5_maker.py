@@ -78,14 +78,12 @@ def preprocessor(preproc_dir, mseed_dir, stations_json, overlap=0.3, n_processor
     
     save_dir = os.path.join(os.getcwd(), str(mseed_dir)+'_processed_hdfs')
     if os.path.isdir(save_dir):
-        print(f' *** " {save_dir} " directory already exists!')
-        inp = input(" * --> Do you want to creat a new empty folder? Type (Yes or y) ")
-        if inp.lower() == "yes" or inp.lower() == "y":        
-            shutil.rmtree(save_dir)  
-    os.makedirs(save_dir)
-              
+        shutil.rmtree(save_dir, ignore_errors=True, onerror=None)
+        os.makedirs(save_dir)
+    else:
+        os.makedirs(save_dir)
     if not os.path.exists(preproc_dir):
-            os.makedirs(preproc_dir)
+        os.makedirs(preproc_dir)
     repfile = open(os.path.join(preproc_dir,"X_preprocessor_report.txt"), 'w');
     
     if platform.system() == 'Windows':
