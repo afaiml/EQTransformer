@@ -9,7 +9,24 @@ tests/__pycache__
 EQTransformer/__pycache__
 EQTransformer/core/__pycache__
 EQTransformer/utils/__pycache__
+App/__pycache__/
+__pycache__/
 
 ## Notebook files
 .ipynb_checkpoints/
 test_predict_on_model.ipynb
+App/Untitled.ipynb
+
+## Output files
+App/detections1/
+App/download_mseeds/
+App/download_mseeds_processed_hdfs/
+App/json/
+App/preproc/
+download_mseeds/
+download_mseeds_processed_hdfs/
+json/
+preproc/
+
+
+
