@@ -270,12 +270,8 @@ def predict_on_model(input_dir=None,
 
     out_dir = os.path.join(os.getcwd(), str(args['output_dir']))
     if os.path.isdir(out_dir):
-        print('============================================================================')        
-        print(f' *** {out_dir} already exists!')
-        inp = input(" --> Type (Yes or y) to create a new empty directory! otherwise it will overwrite!   ")
-        if inp.lower() == "yes" or inp.lower() == "y":
-            shutil.rmtree(out_dir)  
-            os.makedirs(out_dir) 
+        shutil.rmtree(out_dir)  
+    os.makedirs(out_dir) 
     if platform.system() == 'Windows': 
         station_list = [ev.split(".")[0] for ev in listdir(args["input_dir"]) if ev.split("\\")[-1] != ".DS_Store"];
     else:

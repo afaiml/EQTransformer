@@ -21,7 +21,7 @@ import multiprocessing
 import numpy as np
 
 
-def makeStationListExact(json_path, client, stations, start_time, end_time, channel_list=[], **kwargs):
+def makeStationListExact(json_path, client, stations, start_time, end_time, channel_list="*", **kwargs):
     
     """
     Uses fdsn to create an exact station list from a single client and station list.
@@ -43,7 +43,7 @@ def makeStationListExact(json_path, client, stations, start_time, end_time, chan
     end_time: str
     End DateTime for the beginning of the period in "YYYY-MM-DDThh:mm:ss.f" format.
     
-    channel_list: str, default=[]
+    channel_list: str, default="*"
         A list containing the desired channel codes. Downloads will be limited to these channels based on priority. Defaults to [] --> all channels
         
     kwargs: 
@@ -57,6 +57,7 @@ def makeStationListExact(json_path, client, stations, start_time, end_time, chan
     inventory = Client(client).get_stations(station=stations,
                                             starttime=start_time,
                                             endtime=end_time,
+                                            channel=channel_list,
                                             level='channel')
 
     for ev in inventory:
@@ -281,7 +282,7 @@ def downloadMseeds(client_list, stations_json, output_dir, start_time, end_time,
         
        
 
-def downloadMseedsExact(client_name, stations_json, output_dir, start_time, end_time, channel_list=[], n_processor=None):
+def downloadMseedsExact(client, stations_json, output_dir, start_time, end_time, channel_list="*", n_processor=None):
     
     """
     
@@ -289,11 +290,11 @@ def downloadMseedsExact(client_name, stations_json, output_dir, start_time, end_
  
     Parameters
     ----------
-    client_name: str
+    client: str
         client name e.g. "IRIS"
 
-    stations_json: dic,
-        Station informations from the json created in makeStationListExact.
+    stations_json: str,
+        directory path to the makeStationListExact JSON.
         
     output_dir: str
         Output directory.
@@ -304,7 +305,7 @@ def downloadMseedsExact(client_name, stations_json, output_dir, start_time, end_
     end_time: str
         End DateTime for the beginning of the period in "YYYY-MM-DDThh:mm:ss.f" format.
         
-    channel_list: str, default=[]
+    channel_list: str, default="*"
         A list containing the desired channel codes. Downloads will be limited to these channels based on priority. Defaults to [] --> all channels
         
     n_processor: int, default=None
@@ -329,12 +330,15 @@ def downloadMseedsExact(client_name, stations_json, output_dir, start_time, end_
     start_t = UTCDateTime(start_time)
     end_t = UTCDateTime(end_time)
     
-    client = Client(client_name);
+    client = Client(client);
     
     if len(channel_list) == 0:
         channels = "*"
     else:
         channels = channel_list
+ 
+    if os.path.isdir(output_dir):
+        shutil.rmtree(output_dir)
  
     if n_processor==None:
         for st in station_dic:
