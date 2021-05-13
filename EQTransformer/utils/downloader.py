@@ -337,6 +337,9 @@ def downloadMseedsExact(client, stations_json, output_dir, start_time, end_time,
     else:
         channels = channel_list
  
+    if os.path.isdir(output_dir):
+        shutil.rmtree(output_dir)
+ 
     if n_processor==None:
         for st in station_dic:
             print(f'======= Working on {st} station.')
