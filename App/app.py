@@ -11,6 +11,7 @@ from flask import Flask, request
 from EQTransformer.core.predictor import load_tf_model, predict_on_model
 from EQTransformer.utils.hdf5_maker import preprocessor
 from EQTransformer.utils.downloader import makeStationListExact, downloadMseedsExact
+from json_poster import json_poster
 
 
 model = load_tf_model("../ModelsAndSampleData/EqT_model.h5")
@@ -64,8 +65,10 @@ def predict():
                          output_probabilities=True,
                          output_dir = "detections1")
         
+        json_poster("detections1", "https://config.osnds.net/json_in")
+        
         return "Prediction created"
-        ## Call Converter and Post to USNDS once we have that info.
+
         
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=False, port=5005, threaded=False)

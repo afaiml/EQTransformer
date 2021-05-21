@@ -9,7 +9,6 @@ Created on Friday May 7 18:45:00
 """
 
 import requests
-import json
 
 predict_json = {"client": "IRIS",
                 "start_time": "2021-04-01 00:20:00.00",
