@@ -58,6 +58,7 @@ def create_json():
                              start_time = start_time,
                              end_time = end_time,
                              channel_list="BH*")
+    return "JSON Created"
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -66,7 +67,7 @@ def predict():
     predict_on_model methods in that order.  This requires that the 
     create_json function has been run and that a json exists on the server 
     machine.  This function stores intermidiate mseeds and hdf5s.  The result
-    folder is detections1.  All these folder are overwritten each time it runs.
+    folder is detections1.  All these folder are overwritten
 
     Returns
     -------
@@ -98,6 +99,7 @@ def predict():
         ## Uncomment when OSNDS Server can be connected to.
         ## json_poster("detections1", "https://config.osnds.net/json_in")
         
+        return "Predictions Made"
         
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=False, port=5005, threaded=False)
