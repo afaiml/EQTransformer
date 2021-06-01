@@ -24,7 +24,8 @@ import numpy as np
 def makeStationListExact(json_path, client, stations, start_time, end_time, channel_list="*", **kwargs):
     
     """
-    Uses fdsn to create an exact station list from a single client and station list.
+    Uses fdsn to create an exact station list from a single client and station list.  This is added code to the original 
+    EQTransformer Package for the AIML specific usage.  It reuses much of the code from the makeStationList method. 
     
     Parameters
     ----------
@@ -286,7 +287,8 @@ def downloadMseedsExact(client, stations_json, output_dir, start_time, end_time,
     
     """
     
-    Uses obspy downloader to get continuous waveforms from a specific client in miniseed format. 
+    Uses obspy downloader to get continuous waveforms from a specific client in miniseed format. This is added code to the original 
+    EQTransformer Package for the AIML specific usage.  It reuses much of the code from the downloadMseeds method. 
  
     Parameters
     ----------
